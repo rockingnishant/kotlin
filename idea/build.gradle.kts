@@ -139,7 +139,6 @@ val performanceTest by run {
 
 projectTest {
     dependsOn(":dist")
-    dependsOn("performanceTest")
     workingDir = rootDir
 }
 
