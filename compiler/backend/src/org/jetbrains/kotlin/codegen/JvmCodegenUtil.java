@@ -11,6 +11,7 @@ import kotlin.collections.CollectionsKt;
 import kotlin.text.StringsKt;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.kotlin.builtins.functions.FunctionInvokeDescriptor;
 import org.jetbrains.kotlin.codegen.binding.CalculatedClosure;
 import org.jetbrains.kotlin.codegen.context.CodegenContext;
 import org.jetbrains.kotlin.codegen.context.FacadePartWithSourceFile;
@@ -22,7 +23,8 @@ import org.jetbrains.kotlin.descriptors.impl.LocalVariableDescriptor;
 import org.jetbrains.kotlin.load.java.JvmAbi;
 import org.jetbrains.kotlin.load.java.descriptors.JavaCallableMemberDescriptor;
 import org.jetbrains.kotlin.load.java.descriptors.JavaPropertyDescriptor;
-import org.jetbrains.kotlin.load.kotlin.*;
+import org.jetbrains.kotlin.load.kotlin.ModuleMapping;
+import org.jetbrains.kotlin.load.kotlin.ModuleVisibilityUtilsKt;
 import org.jetbrains.kotlin.psi.Call;
 import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.psi.KtFunction;
@@ -36,6 +38,7 @@ import org.jetbrains.kotlin.resolve.scopes.receivers.ReceiverValue;
 import org.jetbrains.kotlin.resolve.scopes.receivers.TransientReceiver;
 import org.jetbrains.kotlin.serialization.deserialization.descriptors.DeserializedCallableMemberDescriptor;
 import org.jetbrains.kotlin.types.KotlinType;
+import org.jetbrains.kotlin.util.OperatorNameConventions;
 
 import java.io.File;
 
@@ -312,5 +315,17 @@ public class JvmCodegenUtil {
         return !isJvmInterface(descriptor.getContainingDeclaration()) &&
                kind != OwnerKind.DEFAULT_IMPLS &&
                !Boolean.FALSE.equals(bindingContext.get(BindingContext.BACKING_FIELD_REQUIRED, descriptor));
+    }
+
+    public static boolean isDeclarationOrOverrideOfBigArityFunctionInvoke(@Nullable DeclarationDescriptor descriptor) {
+        if (descriptor instanceof FunctionInvokeDescriptor) {
+            return ((FunctionInvokeDescriptor) descriptor).hasBigArity();
+        }
+
+        if (!(descriptor instanceof FunctionDescriptor) || !descriptor.getName().equals(OperatorNameConventions.INVOKE)) return false;
+
+        return CollectionsKt.any(DescriptorUtils.getAllOverriddenDeclarations((FunctionDescriptor) descriptor), overridden ->
+                overridden instanceof FunctionInvokeDescriptor && ((FunctionInvokeDescriptor) overridden).hasBigArity()
+        );
     }
 }
