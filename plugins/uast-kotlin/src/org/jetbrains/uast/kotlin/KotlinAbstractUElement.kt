@@ -56,22 +56,22 @@ abstract class KotlinAbstractUElement(private val givenParent: UElement?) : Kotl
             when (target) {
                 AnnotationUseSiteTarget.PROPERTY_GETTER ->
                     parent = (parentUnwrapped as? KtProperty)?.getter
-                             ?: (parentUnwrapped as? KtParameter)?.toLightGetter()
-                             ?: parent
+                            ?: (parentUnwrapped as? KtParameter)?.toLightGetter()
+                            ?: parent
 
                 AnnotationUseSiteTarget.PROPERTY_SETTER ->
                     parent = (parentUnwrapped as? KtProperty)?.setter
-                             ?: (parentUnwrapped as? KtParameter)?.toLightSetter()
-                             ?: parent
+                            ?: (parentUnwrapped as? KtParameter)?.toLightSetter()
+                            ?: parent
                 AnnotationUseSiteTarget.FIELD ->
                     parent = (parentUnwrapped as? KtProperty)
-                             ?: (parentUnwrapped as? KtParameter)
-                                     ?.takeIf { it.isPropertyParameter() }
-                                     ?.let(LightClassUtil::getLightClassBackingField)
-                             ?: parent
+                            ?: (parentUnwrapped as? KtParameter)
+                        ?.takeIf { it.isPropertyParameter() }
+                        ?.let(LightClassUtil::getLightClassBackingField)
+                            ?: parent
                 AnnotationUseSiteTarget.SETTER_PARAMETER ->
                     parent = (parentUnwrapped as? KtParameter)
-                                     ?.toLightSetter()?.parameterList?.parameters?.firstOrNull() ?: parent
+                        ?.toLightSetter()?.parameterList?.parameters?.firstOrNull() ?: parent
             }
         }
         if (psi is UastKotlinPsiVariable && parent != null) {
@@ -149,7 +149,8 @@ fun doConvertParent(element: UElement, parent: PsiElement?): UElement? {
     }
 
     if (result is KotlinUDestructuringDeclarationExpression &&
-        element.psi == (parent as KtDestructuringDeclaration).initializer) {
+        element.psi == (parent as KtDestructuringDeclaration).initializer
+    ) {
         return result.tempVarAssignment
     }
 
@@ -166,16 +167,16 @@ fun doConvertParent(element: UElement, parent: PsiElement?): UElement? {
         && element !is UBlockExpression
         && element !is UTypeReferenceExpression // when element is a type in extension methods
     ) {
-        return KotlinUBlockExpression.KotlinLazyUBlockExpression(result, { block ->
+        return KotlinUBlockExpression.KotlinLazyUBlockExpression(result) { block ->
             listOf(KotlinUImplicitReturnExpression(block).apply { returnExpression = element })
-        }).expressions.single()
+        }.expressions.single()
     }
 
     return result
 }
 
 private fun isInConditionBranch(element: UElement, result: USwitchClauseExpressionWithBody) =
-        element.psi?.parentsWithSelf?.takeWhile { it !== result.psi }?.any { it is KtWhenCondition } ?: false
+    element.psi?.parentsWithSelf?.takeWhile { it !== result.psi }?.any { it is KtWhenCondition } ?: false
 
 
 private fun findAnnotationClassFromConstructorParameter(parameter: KtParameter): UClass? {
