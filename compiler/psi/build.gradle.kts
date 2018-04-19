@@ -22,8 +22,8 @@ dependencies {
     compile(project(":compiler:util"))
     compile(project(":kotlin-script-runtime"))
 
-    compileOnly(intellijCoreDep()) { includeJars("intellij-core", "annotations") }
-    compileOnly(intellijDep()) { includeJars("guava", "trove4j", rootProject = rootProject) }
+    compileOnly(intellijCoreDep()) { includeJars("intellij-core") }
+    compileOnly(intellijDep()) { includeIntellijCoreJarDependencies(project) }
 
     jflexPath(commonDep("org.jetbrains.intellij.deps.jflex", "jflex"))
 }
