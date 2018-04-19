@@ -17,14 +17,31 @@
 package org.jetbrains.uast.kotlin.internal
 
 import com.intellij.psi.PsiComment
+import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiWhiteSpace
+import org.jetbrains.kotlin.psi.KtValueArgument
 import org.jetbrains.uast.JvmDeclarationUElement
 import org.jetbrains.uast.UComment
-import org.jetbrains.uast.UElement
+import org.jetbrains.uast.java.internal.JavaUElementWithComments
 
-interface KotlinUElementWithComments : UElement, JvmDeclarationUElement {
+interface KotlinUElementWithComments : JavaUElementWithComments, JvmDeclarationUElement {
+
     override val comments: List<UComment>
         get() {
-            val psi = psi ?: return emptyList()
-            return psi.children.filter { it is PsiComment }.map { UComment(it, this) }
+            val result = super<JavaUElementWithComments>.comments
+            val parent = psi?.parent as? KtValueArgument ?: return result
+
+            return result +
+                    parent.nearestCommentSibling(forward = true)?.let { listOf(UComment(it, this)) }.orEmpty() +
+                    parent.nearestCommentSibling(forward = false)?.let { listOf(UComment(it, this)) }.orEmpty()
         }
+
+    private fun PsiElement.nearestCommentSibling(forward: Boolean): PsiComment? {
+        var sibling = if (forward) nextSibling else prevSibling
+        while (sibling is PsiWhiteSpace && !sibling.text.contains('\n')) {
+            sibling = if (forward) sibling.nextSibling else sibling.prevSibling
+        }
+        return sibling as? PsiComment
+    }
+
 }
