@@ -11,11 +11,13 @@ import com.intellij.openapi.components.ServiceManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileTypes.FileTypeRegistry
 import com.intellij.openapi.module.Module
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.rootManager
 import com.intellij.openapi.roots.ModuleRootEvent
 import com.intellij.openapi.roots.ModuleRootListener
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.InvalidVirtualFileAccessException
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
@@ -237,38 +239,62 @@ class PerModulePackageCacheService(private val project: Project) {
         if (pendingVFileChanges.size + pendingKtFileChanges.size >= FULL_DROP_THRESHOLD) {
             onTooComplexChange()
         } else {
-
-            pendingVFileChanges.forEach { event ->
-                val vfile = event.file ?: return@forEach
-                // When VirtualFile !isValid (deleted for example), it impossible to use getModuleInfoByVirtualFile
-                // For directory we must check both is it in some sourceRoot, and is it contains some sourceRoot
-                if (vfile.isDirectory || !vfile.isValid) {
-                    for ((module, data) in cache) {
-                        val sourceRootUrls = module.rootManager.sourceRootUrls
-                        if (sourceRootUrls.any { url ->
-                                vfile.containedInOrContains(url)
-                            }) {
-                            data.clear()
+            val unprocessedPendingVFileChanges = pendingVFileChanges.filterNot { event ->
+                processPending {
+                    val vfile = event.file ?: return@filterNot true
+                    // When VirtualFile !isValid (deleted for example), it impossible to use getModuleInfoByVirtualFile
+                    // For directory we must check both is it in some sourceRoot, and is it contains some sourceRoot
+                    if (vfile.isDirectory || !vfile.isValid) {
+                        for ((module, data) in cache) {
+                            val sourceRootUrls = module.rootManager.sourceRootUrls
+                            if (sourceRootUrls.any { url ->
+                                    vfile.containedInOrContains(url)
+                                }) {
+                                data.clear()
+                            }
+                        }
+                    } else {
+                        (getModuleInfoByVirtualFile(project, vfile) as? ModuleSourceInfo)?.let {
+                            invalidateCacheForModuleSourceInfo(it)
                         }
                     }
-                } else {
-                    (getModuleInfoByVirtualFile(project, vfile) as? ModuleSourceInfo)?.let {
-                        invalidateCacheForModuleSourceInfo(it)
+                    try {
+                        implicitPackagePrefixCache.update(event)
+                    } catch (exc: InvalidVirtualFileAccessException) {
+                        // Log and proceed. Otherwise pendingVFileChanges won't be cleared and event going to be stacked in collection.
+                        LOG.error(exc)
                     }
                 }
-                implicitPackagePrefixCache.update(event)
             }
             pendingVFileChanges.clear()
+            pendingVFileChanges.addAll(unprocessedPendingVFileChanges)
 
-            pendingKtFileChanges.forEach { file ->
-                if (file.virtualFile != null && file.virtualFile !in projectScope) {
-                    return@forEach
+            val unprocessedPendingKtFilesChanges = pendingKtFileChanges.filterNot { file ->
+                processPending {
+                    if (file.virtualFile != null && file.virtualFile !in projectScope) {
+                        return@filterNot true
+                    }
+                    (file.getNullableModuleInfo() as? ModuleSourceInfo)?.let { invalidateCacheForModuleSourceInfo(it) }
+                    implicitPackagePrefixCache.update(file)
                 }
-                (file.getNullableModuleInfo() as? ModuleSourceInfo)?.let { invalidateCacheForModuleSourceInfo(it) }
-                implicitPackagePrefixCache.update(file)
             }
             pendingKtFileChanges.clear()
+            pendingKtFileChanges.addAll(unprocessedPendingKtFilesChanges)
         }
+    }
+
+    private inline fun processPending(body: () -> Unit): Boolean {
+        try {
+            body()
+        } catch (pce: ProcessCanceledException) {
+            // Retry processing
+            return false
+        } catch (exc: Exception) {
+            // Log and proceed. Otherwise pending object processing won't be cleared and exception will be thrown forever.
+            LOG.error(exc)
+        }
+
+        return true
     }
 
     private fun VirtualFile.containedInOrContains(root: String) =
