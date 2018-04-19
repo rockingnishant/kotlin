@@ -78,32 +78,20 @@ abstract class KotlinAbstractUElement(private val givenParent: UElement?) : Kotl
             parent = parent.parent
         }
 
-        while (parent is KtStringTemplateEntryWithExpression ||
-               parent is KtStringTemplateExpression && parent.entries.size == 1) {
-            parent = parent.parent
-        }
+        fun PsiElement.hasDirectUastRepresentation(): Boolean =
+            when (this) {
+                is KtStringTemplateEntryWithExpression -> false
+                is KtStringTemplateExpression -> entries.size != 1
+                is KtWhenConditionWithExpression -> false
+                is KtImportList -> false
+                is KtLambdaExpression -> false
+                is KtLambdaArgument -> false
+                is KtSuperTypeList -> false
+                is KtPropertyDelegate -> false
+                else -> true
+            }
 
-        if (parent is KtWhenConditionWithExpression) {
-            parent = parent.parent
-        }
-
-        if (parent is KtImportList) {
-            parent = parent.parent
-        }
-
-        if (psi is KtFunctionLiteral && parent is KtLambdaExpression) {
-            parent = parent.parent
-        }
-
-        if (parent is KtLambdaArgument) {
-            parent = parent.parent
-        }
-
-        if (psi is KtSuperTypeCallEntry) {
-            parent = parent?.parent
-        }
-
-        if (parent is KtPropertyDelegate) {
+        while (parent?.hasDirectUastRepresentation() == false) {
             parent = parent.parent
         }
 
