@@ -17,13 +17,13 @@ class KotlinEvaluatorExtension : AbstractEvaluatorExtension(KotlinLanguage.INSTA
     }
 
     private class UClosedRangeConstant(override val value: Range, override val source: UBinaryExpression?) : UAbstractConstant() {
-        constructor(from: UValue, to: UValue, source: UBinaryExpression): this(Range(from, to), source)
+        constructor(from: UValue, to: UValue, source: UBinaryExpression) : this(Range(from, to), source)
     }
 
     override fun evaluatePostfix(
-            operator: UastPostfixOperator,
-            operandValue: UValue,
-            state: UEvaluationState
+        operator: UastPostfixOperator,
+        operandValue: UValue,
+        state: UEvaluationState
     ): UEvaluationInfo {
         return when (operator) {
             KotlinPostfixOperators.EXCLEXCL -> when (operandValue.toConstant()) {
@@ -41,10 +41,10 @@ class KotlinEvaluatorExtension : AbstractEvaluatorExtension(KotlinLanguage.INSTA
     }
 
     override fun evaluateBinary(
-            binaryExpression: UBinaryExpression,
-            leftValue: UValue,
-            rightValue: UValue,
-            state: UEvaluationState
+        binaryExpression: UBinaryExpression,
+        leftValue: UValue,
+        rightValue: UValue,
+        state: UEvaluationState
     ): UEvaluationInfo {
         return when (binaryExpression.operator) {
             KotlinBinaryOperators.IN -> rightValue.contains(leftValue)
