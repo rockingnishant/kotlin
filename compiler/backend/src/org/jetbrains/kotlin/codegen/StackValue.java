@@ -209,6 +209,11 @@ public abstract class StackValue {
     }
 
     @NotNull
+    public static StackValue constant(int value) {
+        return constant(value, Type.INT_TYPE);
+    }
+
+    @NotNull
     public static StackValue constant(@Nullable Object value, @NotNull Type type) {
         return constant(value, type, null);
     }
